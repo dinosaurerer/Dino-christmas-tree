@@ -1,0 +1,508 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Magic Holiday - Custom Text</title>
+    <!-- 引入多种字体：Great Vibes(英手写), Ma Shan Zheng(中毛笔), Long Cang(中草书) -->
+    <link href="https://fonts.googleapis.com/css2?family=Great+Vibes&family=Ma+Shan+Zheng&family=Long+Cang&family=Noto+Sans+SC:wght@700&display=swap" rel="stylesheet">
+    <style>
+        body { margin: 0; overflow: hidden; background-color: #000; font-family: 'Segoe UI', sans-serif; transition: background 1s ease; }
+        
+        /* 背景样式 */
+        body.bg-black { background: #000; }
+        body.bg-deep { background: radial-gradient(circle at center, #1a1a2e 0%, #000000 100%); }
+        body.bg-warm { background: radial-gradient(circle at center, #2e1a1a 0%, #0f0505 100%); }
+        body.bg-aurora { background: radial-gradient(circle at top, #0f2027 0%, #203a43 50%, #2c5364 100%); }
+        body.bg-china { background: radial-gradient(circle at center, #4a0000 0%, #1a0000 100%); }
+
+        /* 标题基础样式 */
+        #main-title {
+            position: absolute; top: 20px; left: 0; width: 100%;
+            text-align: center; z-index: 50; pointer-events: none; opacity: 0; transition: all 0.5s ease;
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+            text-shadow: 0 0 20px rgba(255,215,0,0.3);
+            /* 默认字体大小，会被JS覆盖 */
+            font-size: 5rem; 
+            white-space: nowrap;
+        }
+
+        /* 圣诞配色 */
+        .style-xmas {
+            background: linear-gradient(to bottom, #ffd700, #ffec8b);
+        }
+        /* 新春配色 */
+        .style-cny {
+            background: linear-gradient(to bottom, #ff3333, #ffd700);
+            text-shadow: 0 0 30px rgba(255, 0, 0, 0.6);
+        }
+
+        /* 启动页 */
+        #start-screen {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: #000; z-index: 200; display: flex; flex-direction: column;
+            justify-content: center; align-items: center; color: #fff;
+        }
+        #btn-start {
+            padding: 15px 50px; font-size: 20px; background: linear-gradient(90deg, #ffd700, #ffaa00);
+            border: none; border-radius: 30px; color: #000; font-weight: bold; cursor: pointer;
+            box-shadow: 0 0 30px rgba(255, 215, 0, 0.3); margin-top: 30px; transition: transform 0.2s;
+        }
+        #btn-start:hover { transform: scale(1.05); }
+
+        /* 照片弹窗 */
+        #photo-modal {
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%) scale(0.5);
+            max-width: 80%; max-height: 80%; background: #fff; padding: 10px 10px 40px 10px;
+            box-shadow: 0 30px 60px rgba(0,0,0,0.8); z-index: 150;
+            opacity: 0; pointer-events: none; transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+            border-radius: 4px;
+        }
+        #photo-modal.active { opacity: 1; transform: translate(-50%, -50%) scale(1) rotate(-3deg); }
+        #photo-modal img { max-width: 100%; max-height: 60vh; display: block; }
+        #photo-caption { text-align: center; color: #333; font-family: 'Great Vibes', cursive; font-size: 2rem; margin-top: 5px; }
+
+        /* 摄像头小窗 */
+        #input_video {
+            position: absolute; bottom: 20px; left: 20px;
+            width: 200px; height: 150px; border-radius: 12px;
+            border: 2px solid rgba(255,255,255,0.2);
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+            transform: scaleX(-1); z-index: 90; object-fit: cover;
+            transition: opacity 0.5s ease;
+        }
+        #input_video.hidden-cam { opacity: 0; pointer-events: none; }
+
+        /* 设置按钮 */
+        #toggle-btn {
+            position: absolute; top: 20px; right: 20px; width: 40px; height: 40px;
+            background: rgba(255,255,255,0.1); border-radius: 50%; color: #fff;
+            border: 1px solid rgba(255,255,255,0.2); cursor: pointer; z-index: 101;
+            display: flex; justify-content: center; align-items: center; font-size: 18px;
+        }
+
+        /* === UI 面板优化 === */
+        #ui-panel {
+            position: absolute; top: 80px; right: 20px; width: 300px;
+            max-height: 85vh; overflow-y: auto;
+            background: rgba(15, 15, 20, 0.85); backdrop-filter: blur(15px);
+            padding: 20px; border-radius: 12px; color: #fff;
+            border: 1px solid rgba(255,255,255,0.15); z-index: 100;
+            transition: transform 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
+            box-shadow: -5px 0 20px rgba(0,0,0,0.5);
+        }
+        #ui-panel.hidden { transform: translateX(130%); }
+        /* 滚动条美化 */
+        #ui-panel::-webkit-scrollbar { width: 5px; }
+        #ui-panel::-webkit-scrollbar-thumb { background: #444; border-radius: 3px; }
+
+        .control-section { border-bottom: 1px dashed rgba(255,255,255,0.15); padding-bottom: 15px; margin-bottom: 15px; }
+        .control-section:last-child { border-bottom: none; }
+        
+        .control-group { margin-bottom: 10px; }
+        .control-group label { display: flex; justify-content: space-between; font-size: 12px; color: #ccc; margin-bottom: 5px; }
+        
+        /* 输入控件样式 */
+        input[type=range] { width: 100%; accent-color: #ffd700; cursor: pointer; }
+        input[type=text] {
+            width: 100%; padding: 8px; background: rgba(0,0,0,0.3); border: 1px solid #444;
+            color: #ffd700; border-radius: 4px; font-size: 14px; box-sizing: border-box;
+        }
+        select { width: 100%; padding: 6px; background: #222; border: 1px solid #444; color: #fff; border-radius: 4px; }
+        
+        .btn { width: 100%; padding: 8px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); color: white; cursor: pointer; border-radius: 6px; font-size: 12px; transition: 0.2s; }
+        .btn:hover { background: rgba(255,255,255,0.2); }
+        .btn.active { background: linear-gradient(90deg, #ff7675, #d63031); border:none; font-weight:bold; }
+
+        h3 { margin: 0 0 10px 0; font-size: 14px; color: #ffd700; font-weight: bold; }
+    </style>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+</head>
+<body class="bg-black">
+
+    <div id="main-title" class="style-xmas">Merry Christmas</div>
+
+    <!-- 启动页 -->
+    <div id="start-screen">
+        <h1 style="font-family: 'Great Vibes'; font-size: 4rem; color: #ffd700; margin: 0;">Winter Magic</h1>
+        <div style="margin-top:20px; text-align:center; color:#aaa; font-size:16px; line-height:1.8;">
+            ⬅️ <strong>左手</strong>：控制爆炸 | ➡️ <strong>右手</strong>：捏合取图<br>
+            可在控制台自定义标题文字
+        </div>
+        <button id="btn-start">开始体验 ✨</button>
+    </div>
+
+    <div id="photo-modal">
+        <img id="modal-img" src="" alt="Memory">
+        <div id="photo-caption">Sweet Memory</div>
+    </div>
+
+    <button id="toggle-btn">⚙️</button>
+    <video id="input_video" class="hidden-cam"></video>
+
+    <!-- 控制面板 -->
+    <div id="ui-panel">
+        <div class="control-group">
+            <button id="btn-fullscreen" class="btn">⛶ 全屏模式</button>
+        </div>
+
+        <!-- 1. 文字自定义模块 -->
+        <div class="control-section">
+            <h3>📝 文字自定义</h3>
+            <div class="control-group">
+                <label>标题内容</label>
+                <input type="text" id="custom-text" value="Merry Christmas">
+            </div>
+            <div class="control-group">
+                <label>字体大小 <span id="val-font-size">5.0</span>rem</label>
+                <input type="range" id="font-size" min="2.0" max="10.0" step="0.5" value="5.0">
+            </div>
+            <div class="control-group">
+                <label>选择字体</label>
+                <select id="font-family">
+                    <option value="'Great Vibes', cursive">Great Vibes (英/手写)</option>
+                    <option value="'Ma Shan Zheng', cursive">马善政 (中/毛笔)</option>
+                    <option value="'Long Cang', cursive">龙苍 (中/草书)</option>
+                    <option value="'Noto Sans SC', sans-serif">思源黑体 (中/粗体)</option>
+                    <option value="'Segoe UI', sans-serif">系统默认 (简洁)</option>
+                </select>
+            </div>
+        </div>
+
+        <!-- 2. 风格切换 -->
+        <div class="control-section">
+            <h3>🎨 风格与场景</h3>
+            <div class="control-group">
+                <div style="display:flex; gap:10px;">
+                    <button id="theme-xmas" class="btn active">🎄 圣诞</button>
+                    <button id="theme-cny" class="btn">🧧 新春</button>
+                </div>
+            </div>
+            <div class="control-group">
+                <label>背景颜色</label>
+                <select id="bg-select">
+                    <option value="black">🌌 纯黑 (Black)</option>
+                    <option value="deep">🌃 深邃 (Deep Blue)</option>
+                    <option value="warm">🔥 暖冬 (Warm)</option>
+                    <option value="aurora">❄️ 极光 (Aurora)</option>
+                    <option value="china">🧧 中国红 (China Red)</option>
+                </select>
+            </div>
+        </div>
+
+        <!-- 3. 音乐与媒体 -->
+        <div class="control-section">
+            <h3>🎵 媒体控制</h3>
+            <div class="control-group">
+                <label>背景音乐</label>
+                <button class="btn" onclick="document.getElementById('music-input').click()">📁 上传 MP3</button>
+                <input type="file" id="music-input" accept="audio/*" style="display:none;">
+                <div style="display:flex; gap:10px; margin-top:5px;">
+                    <button id="btn-play-pause" class="btn" style="width:40px;">⏸</button>
+                    <input type="range" id="volume-slider" min="0" max="1" step="0.1" value="0.6">
+                </div>
+            </div>
+            <div class="control-group">
+                <label>照片管理</label>
+                <button class="btn" style="background:linear-gradient(90deg, #00b894, #00cec9); color:black;" onclick="document.getElementById('folder-input').click()">📷 导入照片 (多选)</button>
+                <input type="file" id="folder-input" multiple accept="image/*" style="display:none;">
+            </div>
+            <div class="control-group">
+                <label>辅助显示</label>
+                <button id="btn-toggle-cam" class="btn" style="background:rgba(255,255,255,0.15)">📹 显示/隐藏 摄像头</button>
+            </div>
+        </div>
+
+        <!-- 4. 参数调节 -->
+        <div class="control-section">
+            <h3>🎛️ 参数调节</h3>
+            <div class="control-group">
+                <label>旋转速度 <span id="val-rot">0.002</span></label>
+                <input type="range" id="rot-speed" min="0" max="0.02" step="0.001" value="0.002">
+            </div>
+            <div class="control-group">
+                <label>树的高度</label>
+                <input type="range" id="tree-height" min="40" max="100" step="5" value="70">
+            </div>
+            <div class="control-group">
+                <label>音乐律动</label>
+                <input type="range" id="beat-sense" min="0.1" max="3.0" step="0.1" value="1.0">
+            </div>
+        </div>
+    </div>
+
+    <!-- Shader -->
+    <script type="x-shader/x-vertex" id="vertexshader">
+        attribute float size; attribute vec3 customColor; attribute vec3 spherePos; attribute float type;     
+        varying vec3 vColor; varying float vType;
+        uniform float uTime; uniform float uExplosion; uniform float uBeat;      
+        void main() {
+            vColor = customColor; vType = type;
+            float t = uExplosion;
+            float ease = 1.0 - pow(1.0 - t, 3.0);
+            vec3 finalPos = mix(position, spherePos, ease);
+            float beatScale = 1.0;
+            if (t < 0.2) beatScale += uBeat * 0.15 * (1.0 - t*3.0); 
+            if (type > 0.5) beatScale += uBeat * 0.2; 
+            vec4 mvPosition = modelViewMatrix * vec4(finalPos * beatScale, 1.0);
+            float s = size;
+            if(type > 0.5) s *= (1.0 + uBeat * 0.5);
+            gl_PointSize = s * (300.0 / -mvPosition.z);
+            gl_Position = projectionMatrix * mvPosition;
+        }
+    </script>
+    <script type="x-shader/x-fragment" id="fragmentshader">
+        uniform float uTime; uniform float uBeat;
+        varying vec3 vColor; varying float vType;
+        void main() {
+            vec2 coord = gl_PointCoord - vec2(0.5);
+            if(length(coord) > 0.5) discard;
+            vec3 color = vColor; float alpha = 1.0;
+            if(vType > 0.5) {
+                float flash = 0.5 + 0.5 * sin(uTime * 5.0 + vType * 10.0);
+                color += vec3(0.5) * flash * uBeat * 2.0;
+            } else { alpha = 0.8; }
+            gl_FragColor = vec4(color, alpha);
+        }
+    </script>
+
+    <script>
+        const state = { 
+            explosion: 0.0, targetExplosion: 0.0, photoActive: false, treeHeight: 70, rotationSpeed: 0.002,
+            style: 'xmas' // 'xmas' or 'cny'
+        };
+
+        let scene, camera, renderer, clock;
+        let particleSystem, treeGroup, topDecoration;
+        let photoMeshes = [], loadedImages = [];
+        let audioCtx, analyser, dataArray, audioEl;
+        
+        document.getElementById('btn-start').addEventListener('click', () => {
+            const screen = document.getElementById('start-screen');
+            screen.style.opacity = 0; setTimeout(() => screen.remove(), 1000);
+            document.getElementById('main-title').style.opacity = 1;
+            document.getElementById('input_video').classList.remove('hidden-cam');
+            initAudio(); initThree(); setupUI(); startHandTracking();
+        });
+
+        function initAudio() {
+            audioEl = new Audio(); audioEl.crossOrigin = "anonymous";
+            audioEl.src = "https://thirdparty.gtimg.com/C1000007bNrR1HXkjD.m4a?fromtag=38"; audioEl.loop = true;
+            const AudioContext = window.AudioContext || window.webkitAudioContext; audioCtx = new AudioContext();
+            analyser = audioCtx.createAnalyser(); analyser.fftSize = 256; dataArray = new Uint8Array(analyser.frequencyBinCount);
+            const source = audioCtx.createMediaElementSource(audioEl); source.connect(analyser); analyser.connect(audioCtx.destination);
+            audioEl.play().catch(e => console.log(e));
+        }
+
+        function initThree() {
+            clock = new THREE.Clock(); scene = new THREE.Scene(); scene.fog = new THREE.FogExp2(0x000000, 0.004);
+            camera = new THREE.PerspectiveCamera(60, window.innerWidth/window.innerHeight, 0.1, 1000);
+            camera.position.set(0, 30, 90); camera.lookAt(0, 30, 0);
+            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+            renderer.setSize(window.innerWidth, window.innerHeight); renderer.setPixelRatio(window.devicePixelRatio);
+            document.body.appendChild(renderer.domElement);
+            treeGroup = new THREE.Group(); scene.add(treeGroup);
+            
+            createParticles(); createTopObject(); createSnow(); animate();
+        }
+
+        function createParticles() {
+            if(particleSystem) { treeGroup.remove(particleSystem); particleSystem.geometry.dispose(); }
+            const count = 18000;
+            const geo = new THREE.BufferGeometry();
+            const positions = [], spherePos = [], colors = [], sizes = [], types = [];
+            const h = state.treeHeight;
+            const colorHelper = new THREE.Color();
+
+            for(let i=0; i<count; i++) {
+                const y = (i/count) * h;
+                const rBase = (1 - y/h) * (h*0.4);
+                const angle = i * 0.2;
+                const r = rBase * Math.sqrt(Math.random());
+                positions.push(Math.cos(angle)*r, y - 10, Math.sin(angle)*r);
+
+                const v = new THREE.Vector3(Math.random()-0.5, Math.random()-0.5, Math.random()-0.5).normalize();
+                v.multiplyScalar(40 + Math.random()*50);
+                spherePos.push(v.x, v.y + 20, v.z);
+
+                const rnd = Math.random();
+                let type = 0;
+                if (state.style === 'cny') {
+                    if(rnd > 0.95) { type = 2; sizes.push(4); colorHelper.setHex(0xffd700); }
+                    else if(rnd > 0.85) { type = 1; sizes.push(5); colorHelper.setHex(0xff0000); }
+                    else { type = 0; sizes.push(1.5); if(Math.random()>0.5) colorHelper.setHex(0xffcc00); else colorHelper.setHex(0xffaa00); }
+                } else {
+                    if(rnd > 0.96) { type = 2; sizes.push(4); colorHelper.setHex(0xffaa00); }
+                    else if(rnd > 0.92) { type = 1; sizes.push(3); colorHelper.setHex(Math.random()>0.5?0xff0000:0x00aaff); }
+                    else { type = 0; sizes.push(1.5); colorHelper.setHex(0x228b22); }
+                }
+                types.push(type); colors.push(colorHelper.r, colorHelper.g, colorHelper.b);
+            }
+
+            geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+            geo.setAttribute('spherePos', new THREE.Float32BufferAttribute(spherePos, 3));
+            geo.setAttribute('customColor', new THREE.Float32BufferAttribute(colors, 3));
+            geo.setAttribute('size', new THREE.Float32BufferAttribute(sizes, 1));
+            geo.setAttribute('type', new THREE.Float32BufferAttribute(types, 1));
+
+            state.uniforms = { uTime: { value: 0 }, uExplosion: { value: 0 }, uBeat: { value: 0 } };
+            const mat = new THREE.ShaderMaterial({
+                uniforms: state.uniforms, vertexShader: document.getElementById('vertexshader').textContent,
+                fragmentShader: document.getElementById('fragmentshader').textContent,
+                blending: THREE.AdditiveBlending, depthTest: false, transparent: true
+            });
+            particleSystem = new THREE.Points(geo, mat);
+            treeGroup.add(particleSystem);
+        }
+
+        function createTopObject() {
+            if(topDecoration) { treeGroup.remove(topDecoration); }
+            if(state.style === 'xmas') {
+                const s=new THREE.Shape(); const p=5; for(let i=0;i<p*2;i++){ const r=(i%2===0)?4:2; const a=i/p*Math.PI; s.lineTo(Math.cos(a)*r,Math.sin(a)*r); }
+                const g=new THREE.ExtrudeGeometry(s,{depth:1,bevelEnabled:true,bevelThickness:0.5,bevelSize:0.2});
+                topDecoration=new THREE.Mesh(g,new THREE.MeshBasicMaterial({color:0xffdd00}));
+            } else {
+                topDecoration = new THREE.Group();
+                const sphere = new THREE.Mesh(new THREE.SphereGeometry(3.5, 32, 32), new THREE.MeshBasicMaterial({color: 0xff0000})); sphere.scale.set(1, 0.8, 1);
+                const cap1 = new THREE.Mesh(new THREE.CylinderGeometry(2, 2, 0.5, 32), new THREE.MeshBasicMaterial({color: 0xffd700})); cap1.position.y = 2.6;
+                const cap2 = cap1.clone(); cap2.position.y = -2.6;
+                const t1 = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 8, 8), new THREE.MeshBasicMaterial({color: 0xff3300})); t1.position.set(0, -6, 0);
+                const t2 = t1.clone(); t2.position.set(1, -6, 0); t2.rotation.z=0.2;
+                const t3 = t1.clone(); t3.position.set(-1, -6, 0); t3.rotation.z=-0.2;
+                topDecoration.add(sphere, cap1, cap2, t1, t2, t3);
+            }
+            topDecoration.position.y = state.treeHeight;
+            treeGroup.add(topDecoration);
+        }
+
+        function createSnow() {
+            const g=new THREE.BufferGeometry(); const pos=[]; for(let i=0;i<1000;i++) pos.push((Math.random()-0.5)*200,Math.random()*150,(Math.random()-0.5)*200);
+            g.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));
+            window.snowSystem=new THREE.Points(g,new THREE.PointsMaterial({color:0xffffff,size:0.6,transparent:true,opacity:0.6}));
+            scene.add(window.snowSystem);
+        }
+
+        function updatePhotos() {
+            photoMeshes.forEach(m => treeGroup.remove(m)); photoMeshes = [];
+            if(loadedImages.length === 0) return;
+            loadedImages.forEach(img => {
+                const cvs = document.createElement('canvas'); cvs.width=256; cvs.height=256; const ctx = cvs.getContext('2d');
+                ctx.beginPath(); ctx.arc(128,128,120,0,Math.PI*2); ctx.clip();
+                const asp = img.width/img.height;
+                if(asp>1) ctx.drawImage(img, (img.width-img.height)/2, 0, img.height, img.height, 0,0,256,256); else ctx.drawImage(img, 0, (img.height-img.width)/2, img.width, img.width, 0,0,256,256);
+                ctx.lineWidth=10; ctx.strokeStyle = state.style === 'cny' ? '#ffd700' : '#ffffff'; ctx.stroke();
+                const mesh = new THREE.Mesh(new THREE.PlaneGeometry(6,6), new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(cvs), side: THREE.DoubleSide, transparent:true }));
+                const y = Math.random() * (state.treeHeight * 0.8);
+                const r = (1 - y/state.treeHeight) * (state.treeHeight*0.4) + 2; 
+                const a = Math.random() * Math.PI * 2;
+                const origin = new THREE.Vector3(Math.cos(a)*r, y-10, Math.sin(a)*r);
+                const explodeDir = origin.clone().normalize().multiplyScalar(40 + Math.random()*30); explodeDir.y += 20;
+                mesh.position.copy(origin);
+                mesh.userData = { origin: origin, explodePos: explodeDir, imgSrc: img.src };
+                treeGroup.add(mesh); photoMeshes.push(mesh);
+            });
+            alert(`已挂载 ${loadedImages.length} 张照片`);
+        }
+
+        function animate() {
+            requestAnimationFrame(animate); const t = clock.getElapsedTime();
+            let beat = 0; if(analyser) { analyser.getByteFrequencyData(dataArray); let sum = 0; for(let i=0; i<15; i++) sum+=dataArray[i]; beat = (sum/15/255) * parseFloat(document.getElementById('beat-sense').value); }
+            if(state.uniforms) { state.uniforms.uTime.value = t; state.uniforms.uBeat.value = beat; state.explosion += (state.targetExplosion - state.explosion) * 0.05; state.uniforms.uExplosion.value = state.explosion; }
+            
+            const ease = 1.0 - Math.pow(1.0 - state.explosion, 3.0);
+            photoMeshes.forEach(p => { p.position.lerpVectors(p.userData.origin, p.userData.explodePos, ease); p.lookAt(camera.position); p.rotation.z += 0.005 * (1 + state.explosion * 5); });
+            
+            treeGroup.rotation.y += state.rotationSpeed + state.explosion * 0.01;
+            
+            if(topDecoration) {
+                if(state.style === 'xmas') topDecoration.rotation.y -= 0.02;
+                else topDecoration.rotation.z = Math.sin(t * 2) * 0.1;
+                const s = 1 + beat * 0.3; topDecoration.scale.set(s,s,s);
+            }
+            if(window.snowSystem) {
+                const pos = window.snowSystem.geometry.attributes.position.array;
+                for(let i=1; i<pos.length; i+=3) { pos[i] -= 0.3; if(pos[i]<-20) pos[i]=100; }
+                window.snowSystem.geometry.attributes.position.needsUpdate = true;
+            }
+            renderer.render(scene, camera);
+        }
+
+        function startHandTracking() {
+            const video = document.getElementById('input_video');
+            const hands = new Hands({locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`});
+            hands.setOptions({ maxNumHands: 2, modelComplexity: 1, minDetectionConfidence: 0.5, minTrackingConfidence: 0.5 });
+            hands.onResults(results => {
+                let leftFound = false;
+                if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
+                    for (let i = 0; i < results.multiHandedness.length; i++) {
+                        const label = results.multiHandedness[i].label; const lm = results.multiHandLandmarks[i];
+                        if (label === 'Left') {
+                            leftFound = true; const d = Math.hypot(lm[4].x - lm[20].x, lm[4].y - lm[20].y);
+                            state.targetExplosion = Math.min(Math.max((d - 0.15) * 4, 0), 1);
+                        }
+                        if (label === 'Right') {
+                            const pinchDist = Math.hypot(lm[4].x - lm[8].x, lm[4].y - lm[8].y);
+                            if (pinchDist < 0.05) { if (!state.photoActive) { showRandomPhoto(); state.photoActive = true; } }
+                            else if (pinchDist > 0.08) { if (state.photoActive) { document.getElementById('photo-modal').classList.remove('active'); state.photoActive = false; } }
+                        }
+                    }
+                }
+                if (!leftFound) state.targetExplosion = 0;
+            });
+            const cameraUtils = new Camera(video, { onFrame: async () => { await hands.send({image: video}); }, width: 320, height: 240 });
+            cameraUtils.start();
+        }
+        function showRandomPhoto() { if(loadedImages.length === 0) return; const img = loadedImages[Math.floor(Math.random() * loadedImages.length)]; const modal = document.getElementById('photo-modal'); document.getElementById('modal-img').src = img.src; modal.classList.add('active'); }
+
+        function setupUI() {
+            const fsBtn = document.getElementById('btn-fullscreen');
+            fsBtn.addEventListener('click', () => { if(!document.fullscreenElement) { document.documentElement.requestFullscreen(); fsBtn.innerText="❌ 退出全屏模式"; } else { document.exitFullscreen(); fsBtn.innerText="⛶ 全屏模式"; } });
+            document.getElementById('btn-toggle-cam').addEventListener('click', () => { document.getElementById('input_video').classList.toggle('hidden-cam'); });
+            document.getElementById('bg-select').addEventListener('change', (e) => document.body.className = 'bg-'+e.target.value);
+            document.getElementById('toggle-btn').addEventListener('click', () => document.getElementById('ui-panel').classList.toggle('hidden'));
+            
+            document.getElementById('rot-speed').addEventListener('input', (e) => { state.rotationSpeed = parseFloat(e.target.value); document.getElementById('val-rot').innerText = state.rotationSpeed.toFixed(3); });
+            document.getElementById('music-input').addEventListener('change', (e) => { if(e.target.files[0]) { audioEl.src = URL.createObjectURL(e.target.files[0]); audioEl.play(); } });
+            document.getElementById('btn-play-pause').addEventListener('click', () => { if(audioEl.paused) { audioEl.play(); document.getElementById('btn-play-pause').innerText="⏸"; } else { audioEl.pause(); document.getElementById('btn-play-pause').innerText="▶"; } });
+            document.getElementById('volume-slider').addEventListener('input', (e) => audioEl.volume = e.target.value);
+            document.getElementById('folder-input').addEventListener('change', (e) => { const files = Array.from(e.target.files); loadedImages = []; files.forEach(f => { const r = new FileReader(); r.onload=ev=>{ const i=new Image(); i.onload=()=>loadedImages.push(i)===Math.min(files.length,30)&&updatePhotos(); i.src=ev.target.result; }; r.readAsDataURL(f); }); });
+            document.getElementById('tree-height').addEventListener('input', (e) => { state.treeHeight = parseInt(e.target.value); createParticles(); if(topDecoration) topDecoration.position.y = state.treeHeight; });
+            document.getElementById('beat-sense').addEventListener('input', (e) => document.getElementById('beat-sense').value = e.target.value );
+
+            // === 标题文字控制逻辑 ===
+            const titleEl = document.getElementById('main-title');
+            const textInput = document.getElementById('custom-text');
+            const sizeInput = document.getElementById('font-size');
+            const fontSelect = document.getElementById('font-family');
+            
+            textInput.addEventListener('input', (e) => titleEl.innerText = e.target.value);
+            sizeInput.addEventListener('input', (e) => { titleEl.style.fontSize = e.target.value + 'rem'; document.getElementById('val-font-size').innerText = e.target.value; });
+            fontSelect.addEventListener('change', (e) => titleEl.style.fontFamily = e.target.value);
+
+            // === 主题切换逻辑 ===
+            const switchTheme = (type) => {
+                state.style = type;
+                if(type === 'xmas') {
+                    titleEl.innerText = 'Merry Christmas'; titleEl.className = 'style-xmas'; titleEl.style.fontFamily = "'Great Vibes', cursive";
+                    // 更新输入框状态
+                    textInput.value = 'Merry Christmas'; fontSelect.value = "'Great Vibes', cursive";
+                    document.body.className = 'bg-black'; document.getElementById('bg-select').value = 'black';
+                    document.getElementById('theme-xmas').classList.add('active'); document.getElementById('theme-cny').classList.remove('active');
+                } else {
+                    titleEl.innerText = '新春快乐 万事如意'; titleEl.className = 'style-cny'; titleEl.style.fontFamily = "'Ma Shan Zheng', cursive";
+                    textInput.value = '新春快乐 万事如意'; fontSelect.value = "'Ma Shan Zheng', cursive";
+                    document.body.className = 'bg-china'; document.getElementById('bg-select').value = 'china';
+                    document.getElementById('theme-cny').classList.add('active'); document.getElementById('theme-xmas').classList.remove('active');
+                }
+                createParticles(); createTopObject(); if(loadedImages.length > 0) updatePhotos();
+            };
+
+            document.getElementById('theme-xmas').addEventListener('click', () => switchTheme('xmas'));
+            document.getElementById('theme-cny').addEventListener('click', () => switchTheme('cny'));
+        }
+    </script>
+</body>
+</html>
